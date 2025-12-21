@@ -1,8 +1,14 @@
 import { GoogleGenAI, Type, Chat, Content } from "@google/genai";
 import { UserProfile, AnalysisResult } from "../types";
 
-// Initialize Gemini Client
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Lazy client factory so the app can render without an API key present.
+const getClient = () => {
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("Missing VITE_GEMINI_API_KEY. Add it to your .env file.");
+  }
+  return new GoogleGenAI({ apiKey });
+};
 
 const ANALYSIS_MODEL = "gemini-2.5-flash";
 
@@ -23,7 +29,7 @@ export const analyzeProfile = async (profile: UserProfile): Promise<AnalysisResu
     3. Write a brief encouraging summary (2 sentences).
   `;
 
-  const response = await ai.models.generateContent({
+  const response = await getClient().models.generateContent({
     model: ANALYSIS_MODEL,
     contents: prompt,
     config: {
@@ -76,7 +82,7 @@ export const analyzeProfile = async (profile: UserProfile): Promise<AnalysisResu
 };
 
 export const createInterviewSession = (careerTitle: string, history: Content[] = []): Chat => {
-  return ai.chats.create({
+  return getClient().chats.create({
     model: ANALYSIS_MODEL,
     config: {
       systemInstruction: `You are an encouraging career coach conducting a mock interview for a high school student aspiring to be a ${careerTitle}.
