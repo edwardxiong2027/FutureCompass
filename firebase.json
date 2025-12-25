@@ -1,5 +1,6 @@
 {
   "hosting": {
+    "site": "futurecompass-202512",
     "public": "dist",
     "ignore": [
       "firebase.json",
