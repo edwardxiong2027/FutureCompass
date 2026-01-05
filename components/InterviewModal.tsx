@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Chat, Content } from "@google/genai";
-import { createInterviewSession } from '../services/geminiService';
+import { ChatMessage, ChatSession, createInterviewSession } from '../services/openaiService';
 
 interface InterviewModalProps {
   career: string;
@@ -20,7 +19,7 @@ const InterviewModal: React.FC<InterviewModalProps> = ({ career, onClose }) => {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
-  const chatSessionRef = useRef<Chat | null>(null);
+  const chatSessionRef = useRef<ChatSession | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Key for localStorage based on career
@@ -31,7 +30,7 @@ const InterviewModal: React.FC<InterviewModalProps> = ({ career, onClose }) => {
       setIsLoading(true);
       try {
         const savedData = localStorage.getItem(storageKey);
-        let history: Content[] = [];
+        let history: ChatMessage[] = [];
         let savedMessages: Message[] = [];
 
         if (savedData) {
@@ -46,11 +45,11 @@ const InterviewModal: React.FC<InterviewModalProps> = ({ career, onClose }) => {
 
             // Reconstruct history for the SDK
             // We assume the conversation always started with the implicit "Start the interview." command
-            history.push({ role: 'user', parts: [{ text: "Start the interview." }] });
+            history.push({ role: 'user', content: "Start the interview." });
 
             savedMessages.forEach(msg => {
               if (msg.role === 'user' && msg.text) {
-                history.push({ role: 'user', parts: [{ text: msg.text }] });
+                history.push({ role: 'user', content: msg.text });
               } else if (msg.role === 'model') {
                 // Reconstruct the JSON object for the model's history
                 const jsonContent = JSON.stringify({
@@ -58,7 +57,7 @@ const InterviewModal: React.FC<InterviewModalProps> = ({ career, onClose }) => {
                   nextQuestion: msg.question,
                   interviewSummary: msg.summary
                 });
-                history.push({ role: 'model', parts: [{ text: jsonContent }] });
+                history.push({ role: 'assistant', content: jsonContent });
               }
             });
           } catch (e) {

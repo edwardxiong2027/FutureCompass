@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { UserProfile, AnalysisResult, AppState } from './types';
-import { analyzeProfile } from './services/geminiService';
+import { analyzeProfile } from './services/openaiService';
 import SkillsChart from './components/SkillsChart';
 import CareerCard from './components/CareerCard';
 import InterviewModal from './components/InterviewModal';
