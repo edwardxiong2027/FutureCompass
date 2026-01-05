@@ -1,7 +1,7 @@
-import OpenAI from "openai";
 import { UserProfile, AnalysisResult } from "../types";
 
 const MODEL = "gpt-5-nano";
+const OPENAI_BASE_URL = import.meta.env.VITE_OPENAI_BASE_URL || "/api/openai";
 
 type ChatRole = "system" | "user" | "assistant";
 
@@ -13,8 +13,6 @@ export interface ChatMessage {
 export interface ChatSession {
   sendMessage: (params: { message: string }) => Promise<{ text: string | null }>;
 }
-
-let cachedClient: OpenAI | null = null;
 
 const extractText = (content: unknown): string | null => {
   if (!content) return null;
@@ -30,22 +28,35 @@ const extractText = (content: unknown): string | null => {
   return null;
 };
 
-// Lazy client factory so the app can render without an API key present.
-const getClient = () => {
-  if (cachedClient) return cachedClient;
-
-  const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
-  if (!apiKey) {
-    throw new Error("Missing VITE_OPENAI_API_KEY. Add it to your .env file.");
-  }
-
-  cachedClient = new OpenAI({
-    apiKey,
-    // Browser usage is allowed for this client; secure the key via environment variables.
-    dangerouslyAllowBrowser: true,
+const callChatCompletion = async (messages: ChatMessage[], schema: Record<string, unknown>) => {
+  const response = await fetch(`${OPENAI_BASE_URL}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      messages,
+      response_format: {
+        type: "json_schema",
+        json_schema: schema,
+      },
+    }),
   });
 
-  return cachedClient;
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`OpenAI request failed: ${response.status} ${errorText}`);
+  }
+
+  const data = await response.json();
+  const content = extractText(data?.choices?.[0]?.message?.content);
+
+  if (!content) {
+    throw new Error("No response from AI");
+  }
+
+  return content;
 };
 
 const analysisSchema = {
@@ -110,25 +121,16 @@ Task:
 3) Write a brief encouraging summary (2 sentences).
 `;
 
-  const response = await getClient().chat.completions.create({
-    model: MODEL,
-    messages: [
+  const content = await callChatCompletion(
+    [
       {
         role: "system",
         content: "You are an expert career counselor who always returns well-structured JSON following the provided schema.",
       },
       { role: "user", content: prompt },
     ],
-    response_format: {
-      type: "json_schema",
-      json_schema: analysisSchema,
-    },
-  });
-
-  const content = extractText(response.choices[0]?.message?.content);
-  if (!content) {
-    throw new Error("No response from AI");
-  }
+    analysisSchema
+  );
 
   return JSON.parse(content) as AnalysisResult;
 };
@@ -188,19 +190,9 @@ class InterviewChatSession implements ChatSession {
   }
 
   async sendMessage(params: { message: string }) {
-    const client = getClient();
     this.history.push({ role: "user", content: params.message });
 
-    const result = await client.chat.completions.create({
-      model: MODEL,
-      messages: this.history,
-      response_format: {
-        type: "json_schema",
-        json_schema: interviewSchema,
-      },
-    });
-
-    const text = extractText(result.choices[0]?.message?.content);
+    const text = await callChatCompletion(this.history, interviewSchema);
 
     if (text) {
       this.history.push({ role: "assistant", content: text });

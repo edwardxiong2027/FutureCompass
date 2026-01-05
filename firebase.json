@@ -9,6 +9,13 @@
     ],
     "cleanUrls": true,
     "rewrites": [
+      {
+        "source": "/api/openai/**",
+        "function": {
+          "functionId": "openaiProxy",
+          "region": "us-central1"
+        }
+      },
       { "source": "**", "destination": "/index.html" }
     ],
     "headers": [
